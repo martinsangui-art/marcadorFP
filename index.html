@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JAM7</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0E1410">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="JAM7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<div class="app density-comfy" id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">7</div>
+      <div class="brand-txt">
+        <h1 class="app-name">JAM7</h1>
+        <div class="sub" id="weekSub">Marcador semanal</div>
+      </div>
+    </div>
+    <nav class="toolbar">
+      <button class="btn" id="installBtn" style="display:none">Instalar</button>
+      <button class="btn" id="historyBtn" title="Historial">Historial</button>
+      <button class="btn" id="settingsBtn" title="Ajustes">Ajustes</button>
+      <button class="btn lime" id="exportBtn">CSV</button>
+      <button class="btn icon-only" id="exportJsonBtn" title="Exportar backup JSON">↓ JSON</button>
+      <button class="btn icon-only" id="importJsonBtn" title="Importar backup JSON">↑ JSON</button>
+      <input type="file" id="importJsonInput" accept="application/json" hidden>
+      <button class="btn bad" id="resetBtn">Reiniciar</button>
+    </nav>
+  </header>
+
+  <section class="ios-install" id="iosInstall" hidden>
+    <strong>Tip iPhone:</strong> Abrí en Safari → compartir → <b>“Agregar a inicio”</b>.
+    <button class="btn small" id="hideIosTip">Entendido</button>
+  </section>
+
+  <main id="main">
+    <section class="scoreboardWrap">
+      <div class="scoreboard">
+        <div class="seg">
+          <div class="seg-label">Total</div>
+          <div class="seg-val" id="wbTotal">00:00</div>
+        </div>
+        <div class="seg">
+          <div class="seg-label">Saldo</div>
+          <div class="seg-val" id="wbSaldo">0</div>
+        </div>
+        <div class="seg">
+          <div class="seg-label">Salida hoy</div>
+          <div class="seg-val amber" id="wbSuggestTop">—</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="alertBanner" class="alert-banner" hidden>
+      <span id="alertBannerText"></span>
+    </div>
+
+    <section class="card">
+      <div class="daysGrid" id="days"></div>
+    </section>
+  </main>
+
+  <footer class="foot">// jam7 — running total</footer>
+</div>
+
+<!-- Modal edición manual -->
+<div class="modal" id="timeModal" hidden>
+  <div class="panel">
+    <h3 id="modalTitle">Editar hora (<span id="modalLabel"></span>)</h3>
+    <div class="help">Formato 24 hs. Solo números.</div>
+    <div class="numgrid">
+      <label>Hora (0–23)
+        <input type="number" id="hh" min="0" max="23" inputmode="numeric" placeholder="HH">
+      </label>
+      <label>Minuto (0–59)
+        <input type="number" id="mm" min="0" max="59" inputmode="numeric" placeholder="MM">
+      </label>
+    </div>
+    <div class="help" id="modalHint"></div>
+    <div class="modal-actions">
+      <button class="btn small" id="cancelEdit">Cancelar</button>
+      <button class="btn lime small" id="saveEdit">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ajustes -->
+<div class="modal" id="settingsModal" hidden>
+  <div class="panel">
+    <h3 id="settingsTitle">Ajustes</h3>
+    <div class="settings-grid">
+      <div>
+        <label class="muted">Modo Solo lectura
+          <input type="checkbox" id="readonlyToggle"> <span class="muted smalltxt">Desactiva marcación/edición</span>
+        </label>
+      </div>
+      <div>
+        <label class="muted">Meta diaria (hh:mm)
+          <input type="time" id="dailyTarget" value="07:30">
+        </label>
+      </div>
+      <div>
+        <label class="muted">Densidad
+          <select id="densitySel"><option value="comfy">Cómoda</option><option value="compact">Compacta</option></select>
+        </label>
+      </div>
+      <div>
+        <label class="muted">Color de acento
+          <select id="accentSel"><option value="lime">Lima</option><option value="amber">Ámbar</option><option value="cyan">Cian</option><option value="mono">Mono</option></select>
+        </label>
+      </div>
+      <div>
+        <label class="muted">Notificaciones
+          <button class="btn small" id="notifBtn" type="button">Activar avisos</button>
+          <span class="muted smalltxt" id="notifStatus">Avisa cuando se acerca el límite de ingreso o llega tu salida sugerida (solo con la app abierta).</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn" id="closeSettings">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Historial -->
+<div class="modal" id="historyModal" hidden>
+  <div class="panel">
+    <h3>Historial de semanas</h3>
+    <div class="help">Últimas semanas registradas. Se guardan automáticamente al cambiar de semana.</div>
+    <div id="historyList" class="history-list"></div>
+    <div class="modal-actions"><button class="btn" id="closeHistory">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Sheet de atajos -->
+<div class="sheet-backdrop" id="sheetBackdrop" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title" id="sheetTitle">Atajos — <span id="sheetDay"></span></div></div>
+    <div class="sheet-actions" id="sheetActions"></div>
+    <div class="sheet-foot"><button class="btn" id="sheetClose">Cerrar</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
