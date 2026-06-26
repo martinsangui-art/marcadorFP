@@ -279,13 +279,14 @@ function render(){
     if(i===idxToday) card.classList.add('active');
 
     const head=document.createElement('div'); head.className='dayHead';
+    const led=document.createElement('div'); led.className='led';
     const num=document.createElement('div'); num.className='dayNum'; num.textContent=pad(i+1);
     const title=document.createElement('div');title.className='dayTitle';title.textContent=WEEKDAYS[i];
     const dur=document.createElement('div');dur.className='dayDur';
     const hasBoth=rec.in&&rec.out;
     dur.textContent=hasBoth?fmtMinutes(minutesBetween(new Date(rec.in),new Date(rec.out))):"—";
-    if(hasBoth) dur.classList.add('win');
-    head.appendChild(num);head.appendChild(title);head.appendChild(dur);
+    if(hasBoth) { dur.classList.add('win'); led.style.background='var(--lime)'; led.style.boxShadow='0 0 7px var(--lime), inset 0 1px 1px rgba(255,255,255,.4)'; }
+    head.appendChild(led);head.appendChild(num);head.appendChild(title);head.appendChild(dur);
     card.appendChild(head);
 
     const row=document.createElement('div');row.className='clockRow';

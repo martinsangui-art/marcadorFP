@@ -1,6 +1,6 @@
 # JAM7
 
-Marcador semanal de ingreso/egreso laboral. PWA sin backend — todo se guarda en el navegador (localStorage). Pensada para uso informal entre compañeros de oficina, cada uno ve solo sus propios datos.
+Marcador semanal de ingreso/egreso laboral. PWA con backend en Firebase (Firestore + Cloud Functions + push real). Pensada para uso informal entre compañeros de oficina, cada uno ve solo sus propios datos — no hay panel compartido ni ranking.
 
 **Demo / app en vivo:** _(completar con la URL de GitHub Pages una vez publicada)_
 
@@ -35,19 +35,26 @@ Esto es lo que el sistema tiene que cumplir. Si algo en la app contradice esto, 
 
 ## Arquitectura (resumen para no perderse)
 
-- **Sin servidor, sin base de datos.** Todo vive en `localStorage` del navegador de cada persona. Cada usuario tiene su propia semana, su propio historial, su propio backup. No hay forma de ver los datos de otra persona ni un panel centralizado — es la decisión correcta para este uso (competencia informal entre compañeros, no fichaje de RRHH).
-- **Stack:** HTML + CSS + JavaScript vanilla. Sin frameworks, sin build step, sin dependencias de npm.
+**Cliente (lo que corre en el navegador de cada persona):**
+- **Stack:** HTML + CSS + JavaScript vanilla. Sin frameworks, sin build step, sin npm del lado del cliente (Firebase se carga vía CDN, no vía `npm install`).
 - **Archivos:**
   - `index.html` — estructura de la página
-  - `styles.css` — toda la identidad visual (paleta oscura "marcador/scoreboard")
-  - `app.js` — toda la lógica: cálculo de horas, validaciones, render, historial, import/export
-  - `sw.js` — service worker, permite que la app funcione offline e instalarse como PWA
+  - `styles.css` — toda la identidad visual (paleta "panel de control industrial": acero, LEDs de estado, biseles)
+  - `app.js` — toda la lógica: cálculo de horas, validaciones, render, historial, import/export, alertas
+  - `firebase-config.js` — credenciales públicas del proyecto Firebase (son públicas por diseño, no hay nada que ocultar acá — la seguridad real vive en las reglas de Firestore)
+  - `firebase-sync.js` — sincronización: login anónimo, push/pull de datos a Firestore, registro del token de notificaciones push
+  - `sw.js` — **un único service worker** que hace tres cosas a la vez: caché offline (PWA instalable), manejo de click en notificaciones, y recepción de push de Firebase Cloud Messaging en segundo plano. Importante: un sitio solo puede tener un service worker activo, por eso todo vive fusionado en este archivo en vez de tener uno separado para FCM (que es lo que la documentación estándar de Firebase sugiere, pero rompe la instalación PWA si se hace por separado).
   - `manifest.webmanifest` — metadata para instalación (ícono, nombre, colores)
-- **Persistencia:** tres claves de `localStorage`:
-  - `jam7_v6_state` — semana actual
-  - `jam7_history_v1` — semanas archivadas (hasta 26)
-  - `jam7_settings_v3` — preferencias (meta diaria, modo solo lectura, etc.)
-- **Riesgo conocido y aceptado:** si alguien borra el caché del navegador o cambia de dispositivo, pierde sus datos salvo que haya exportado un backup JSON antes. No hay sync automático. Mitigación: botón de exportar/importar JSON ya incluido.
+
+**Backend (Firebase, proyecto `jam7-marcador`):**
+- **Authentication:** modo anónimo. Cada dispositivo obtiene un ID único persistente sin pedir email ni contraseña a nadie.
+- **Firestore:** una colección `users`, un documento por persona (ID = su UID anónimo). Cada documento tiene `state` (semana actual), `history` (semanas archivadas), `settings`, `name`, y `fcmToken` (para mandarle push).
+- **Reglas de seguridad:** cada usuario solo puede leer/escribir su propio documento (`request.auth.uid == userId`). Nadie puede ver los datos de otro, ni siquiera con el código fuente público en GitHub — la regla vive del lado del servidor de Google.
+- **Cloud Functions** (`functions/index.js`, carpeta separada del cliente, con su propio `package.json`): una función programada (`checkAlertsAndNotify`) que corre **cada minuto**, sin depender de que ningún usuario tenga la app abierta. Lee todos los documentos de `users`, replica la misma lógica de horarios que el cliente (margen de ingreso, salida sugerida, hora fija semanal), y manda push real vía FCM cuando corresponde. Requiere plan **Blaze** de Firebase (pago por uso) — Cloud Functions no es compatible con el plan gratuito Spark, aunque el costo real esperado para este volumen de uso es prácticamente $0.
+
+**Estrategia de sincronización cliente↔servidor:** `localStorage` sigue siendo la fuente de verdad *inmediata* (la app responde al instante, sin esperar red). Cada cambio se guarda local primero y se empuja a Firestore en segundo plano (`pushToCloud()`). Al abrir la app, si hay datos más nuevos en la nube (por ejemplo, se usó otro dispositivo), se traen una sola vez al iniciar sesión, sin pisar nada después en esa sesión.
+
+**Riesgo conocido:** si dos personas comparten el mismo navegador/dispositivo sin diferenciarse, sus datos se mezclan — no hay login real con email, solo anónimo por dispositivo. Aceptado como límite consciente para mantener la fricción de uso en cero.
 
 ---
 
@@ -57,6 +64,19 @@ Esto es lo que el sistema tiene que cumplir. Si algo en la app contradice esto, 
 2. `Settings` → `Pages` → Source: `Deploy from a branch` → Branch `main`, carpeta `/ (root)`.
 3. Esperar 1-2 minutos. La URL queda en `https://tu-usuario.github.io/nombre-repo/`.
 4. Cada actualización: commit + push desde GitHub Desktop, se despliega solo.
+
+## Cómo actualizar la Cloud Function (cuando cambia la lógica de horarios)
+
+A diferencia del resto de la app (que se actualiza solo con subir a GitHub), la función vive en un proceso de deploy separado, manual, desde la terminal:
+
+```
+cd functions
+npm install          # solo si se agregaron dependencias nuevas
+cd ..
+firebase deploy --only functions
+```
+
+Requiere tener **Node.js**, **Firebase CLI** (`npm install -g firebase-tools`) y estar logueado (`firebase login`) en la máquina desde la que se despliega. El deploy tarda 1-3 minutos. Confirmar éxito con `✔ Deploy complete!` en la terminal, o revisando los logs en Google Cloud Console.
 
 ---
 
@@ -76,7 +96,7 @@ No hace falta leer el código para mantener este proyecto. Lo que hace falta es 
 
 4. **Empezá cada conversación nueva sobre este proyecto con este prompt ancla:**
 
-   > Estoy trabajando en JAM7, una PWA de marcador horario (sin backend, todo en localStorage). Stack: HTML/CSS/JS vanilla, sin frameworks. Reglas de negocio: jornada 8:30-16:00, ingreso flexible 7:30-9:30, egreso no antes de 15:30, meta 37.5hs/semana (7.5hs/día). Repo: [URL]. Antes de tocar código, decime tu diagnóstico y esperá mi confirmación.
+   > Estoy trabajando en JAM7, una PWA de marcador horario con backend en Firebase (Firestore + Cloud Functions + push real vía FCM). El cliente es HTML/CSS/JS vanilla sin frameworks; la Cloud Function vive en una carpeta separada con su propio package.json. Reglas de negocio: jornada 8:30-16:00, ingreso flexible 7:30-9:30, egreso no antes de 15:30, meta 37.5hs/semana (7.5hs/día), con opción de fijar una salida pareja (15:30 o 16:00) elegida los lunes. Importante: la lógica de horarios está duplicada en app.js (cliente) y functions/index.js (servidor) — cualquier cambio de regla de negocio hay que aplicarlo en los dos lugares. Repo: [URL]. Antes de tocar código, decime tu diagnóstico y esperá mi confirmación.
 
    Esto evita que el modelo tenga que adivinar contexto o arquitectura cada vez, y fuerza a que te expliquen antes de ejecutar.
 
@@ -87,8 +107,21 @@ No hace falta leer el código para mantener este proyecto. Lo que hace falta es 
 - **Feriados:** la lista vive en `app.js`, constante `HOLIDAYS`. Hay que agregar los feriados de cada año nuevo a mano (verificar fechas oficiales, no son siempre las mismas — algunos se trasladan a lunes).
 - **Techo de seguridad de 20:00** en el cálculo de salida sugerida: es un clamp interno que no debería activarse en la práctica. Si en algún momento se define una política de horas extra o jornada máxima, este es el lugar a revisar (`OUT_MAX` en `app.js`, aunque hoy no se usa para bloquear nada, solo queda documentado como referencia).
 
-## Decisión registrada: notificaciones sin servidor (por ahora)
+---
 
-Las alertas (margen de ingreso, hora de salida sugerida) usan `setInterval` + Notification API del navegador — **sin backend, sin push real**. Limitación conocida y aceptada: si la pestaña/app está en segundo plano por mucho tiempo o el dispositivo está bloqueado, el chequeo periódico no corre de forma confiable (los navegadores lo frenan para ahorrar batería). Se mitigó agregando un re-chequeo inmediato cada vez que la app vuelve a primer plano (`visibilitychange`), que cubre el caso real más común: abrís la app para marcar tu egreso y ahí mismo te avisa si corresponde.
+## Notificaciones push: cómo funcionan realmente
 
-**Alternativa evaluada y descartada (por ahora):** notificaciones push reales vía Firebase Cloud Messaging u otro servidor. Se descartó porque requiere migrar de "todo en localStorage" a una base de datos compartida con backend — cambio de arquitectura significativo para el tamaño del problema (uso informal entre pocas personas). Si en el futuro la deuda de horas se vuelve un problema recurrente y el fix liviano no alcanza, revisar esta decisión.
+Decisión tomada (revertida respecto a una evaluación anterior, ver historia más abajo): **sí se implementó push real con servidor**, no solo el fallback liviano del lado del cliente.
+
+- El cliente pide permiso de notificaciones y un **token de FCM** (Firebase Cloud Messaging), que se guarda en su documento de Firestore.
+- La Cloud Function `checkAlertsAndNotify` corre cada minuto en el servidor de Google, sin importar si el celular está bloqueado o la app cerrada del todo.
+- Si corresponde avisar (margen de ingreso por vencer, hora de salida sugerida llegando), manda el push directo al dispositivo vía FCM.
+- Se guarda un campo `notified` por usuario para no mandar el mismo aviso más de una vez por día.
+
+**Verificación de que funciona:** revisar los logs de la función en Google Cloud Console (`Functions` → `checkAlertsAndNotify` → link a "vista de registros"). Cada ejecución exitosa deja una línea `Chequeo completo. Usuarios revisados: N.` — si aparece cada minuto sin errores, el motor funciona; que no dispare push no es un bug si en ese momento no hay ninguna condición de alerta vigente.
+
+**Limitación que persiste igual:** la fórmula de horarios vive duplicada en dos lugares (`app.js` del cliente y `functions/index.js` del servidor) porque Cloud Functions no puede importar directamente código del cliente sin un paso de build adicional. Si se cambia una regla de negocio (por ejemplo el margen de ingreso, o la fórmula de salida sugerida), **hay que actualizar ambos archivos a mano** o el cliente y el servidor van a calcular cosas distintas. Ver `functions/index.js`, comentario al inicio.
+
+### Historia de la decisión (para no repetir la discusión)
+
+En una primera pasada se evaluó y se descartó meter servidor, priorizando simpleza. La razón para revertir esa decisión: la deuda de horas empezó a acumularse de forma real semana a semana (llegadas tarde sin compensar), y el fallback liviano (avisar solo al reabrir la app) no alcanzaba para evitarlo a tiempo. Con backend real, el push llega aunque la app esté cerrada — que es justamente el momento en que más hace falta el aviso.
