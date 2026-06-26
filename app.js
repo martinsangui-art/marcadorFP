@@ -26,10 +26,10 @@ function vibrate(ms=15){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 function readonly(){return localStorage.getItem(RO_KEY)==="1"}
 
 function getSettings(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY))||{dailyTarget:"07:30",density:"comfy",accent:"lime"}}catch(e){return {dailyTarget:"07:30",density:"comfy",accent:"lime"}}}
-function setSettings(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));applySettings()}
+function setSettings(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));applySettings();if(typeof pushToCloud==='function')pushToCloud();}
 
 function getUserName(){ return (localStorage.getItem(NAME_KEY)||"").trim() }
-function setUserName(n){ n=(n||"").trim().slice(0,20); if(n) localStorage.setItem(NAME_KEY,n); applyGreeting(); }
+function setUserName(n){ n=(n||"").trim().slice(0,20); if(n) localStorage.setItem(NAME_KEY,n); applyGreeting(); if(typeof pushToCloud==='function')pushToCloud(); }
 function greetingPhrase(){
   const h=new Date().getHours();
   if(h<12) return "Buen día";
@@ -57,11 +57,11 @@ function targetDayMin(){const s=getSettings().dailyTarget||"07:30";const [hh,mm]
 
 function getState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||initWeek()}catch(e){return initWeek()}}
 function initWeek(){const ws=startOfISOWeek(new Date()).toISOString();const data={weekStart:ws,days:[null,null,null,null,null]};localStorage.setItem(STORAGE_KEY,JSON.stringify(data));return data}
-function saveState(d){localStorage.setItem(STORAGE_KEY,JSON.stringify(d))}
+function saveState(d){localStorage.setItem(STORAGE_KEY,JSON.stringify(d));if(typeof pushToCloud==='function')pushToCloud();}
 
 // --- Historial ---
 function getHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY))||[]}catch(e){return []}}
-function saveHistory(h){localStorage.setItem(HISTORY_KEY,JSON.stringify(h))}
+function saveHistory(h){localStorage.setItem(HISTORY_KEY,JSON.stringify(h));if(typeof pushToCloud==='function')pushToCloud();}
 function archiveWeekIfChanged(prevData){
   if(!prevData||!prevData.weekStart) return;
   const hasAny=prevData.days.some(d=>d&&d.in&&d.out);
@@ -466,4 +466,4 @@ $('#resetBtn').onclick=()=>{ if(confirm("¿Reiniciar semana? (esto NO borra el h
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}) }) }
 
 window.addEventListener('resize',()=>{ detectDevice(); applyReadonly(); });
-(function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); applyGreeting(); maybeAskName(); })();
+(function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); applyGreeting(); maybeAskName(); if(typeof initFirebaseSync==='function') initFirebaseSync(); })();
