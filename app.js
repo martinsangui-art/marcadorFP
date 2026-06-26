@@ -175,7 +175,10 @@ function checkAlerts(){
   if(!rec.in){
     // Todavía no marcó ingreso hoy
     const minsToLimit = IN_BOUNDS[1]-mins; // minutos hasta las 9:30
-    if(mins>IN_BOUNDS[1]){
+    if(mins<IN_BOUNDS[0]){
+      // Madrugada: todavía no abrió la ventana de ingreso (00:00 a 07:30)
+      setBanner('warn', `Todavía no es horario para marcar ingreso. La ventana abre a las ${pad(Math.floor(IN_BOUNDS[0]/60))}:${pad(IN_BOUNDS[0]%60)}.`);
+    } else if(mins>IN_BOUNDS[1]){
       setBanner('urgent','Pasaste el margen de ingreso (09:30). Si llegaste, registrá el horario real en edición manual.');
     } else if(minsToLimit<=IN_WARN_LEAD){
       setBanner('warn',`Te quedan ${minsToLimit} min para marcar ingreso (límite 09:30).`);
