@@ -222,6 +222,22 @@ function startAlertLoop(){
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ checkAlerts(); } });
 }
 
+let liveClockTimer=null;
+function updateLiveClock(){
+  const el=$('#liveClockTime');
+  if(!el) return;
+  const n=new Date();
+  el.textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+}
+function startLiveClock(){
+  updateLiveClock();
+  if(liveClockTimer) clearInterval(liveClockTimer);
+  liveClockTimer=setInterval(updateLiveClock, 1000);
+  // Igual que con las alertas: al volver a la pestaña, resincronizar al instante
+  // en vez de esperar hasta el próximo tick (que puede tardar hasta 1s de más).
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ updateLiveClock(); } });
+}
+
 function updateNotifUI(){
   const btn=$('#notifBtn'), status=$('#notifStatus');
   if(!('Notification' in window)){ btn.disabled=true; btn.textContent='No disponible'; status.textContent='Este navegador no soporta notificaciones.'; return }
@@ -496,4 +512,4 @@ $('#resetBtn').onclick=()=>{ if(confirm("¿Reiniciar semana? (esto NO borra el h
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}) }) }
 
 window.addEventListener('resize',()=>{ detectDevice(); applyReadonly(); });
-(function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); applyGreeting(); maybeAskName(); if(typeof initFirebaseSync==='function') initFirebaseSync(); maybeAskFixedExit(); })();
+(function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); startLiveClock(); applyGreeting(); maybeAskName(); if(typeof initFirebaseSync==='function') initFirebaseSync(); maybeAskFixedExit(); })();

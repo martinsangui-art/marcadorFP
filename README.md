@@ -125,3 +125,15 @@ Decisión tomada (revertida respecto a una evaluación anterior, ver historia m�
 ### Historia de la decisión (para no repetir la discusión)
 
 En una primera pasada se evaluó y se descartó meter servidor, priorizando simpleza. La razón para revertir esa decisión: la deuda de horas empezó a acumularse de forma real semana a semana (llegadas tarde sin compensar), y el fallback liviano (avisar solo al reabrir la app) no alcanzaba para evitarlo a tiempo. Con backend real, el push llega aunque la app esté cerrada — que es justamente el momento en que más hace falta el aviso.
+
+---
+
+## Decisión en pausa: importar marcaciones desde captura del HCM de Oracle
+
+Idea evaluada: subir una foto de la pantalla del HCM (Oracle) y que la app extraiga fecha/ingreso/egreso automáticamente, con confirmación del usuario antes de guardar (nunca automático sin revisión — eso cruzaría una línea de automatización no deseada sobre un sistema corporativo de terceros).
+
+**Opciones evaluadas:**
+- **API de Claude (Anthropic) vía Cloud Function:** la más precisa, pero tiene costo real por uso desde la primera llamada (no hay tier gratis en la API, a diferencia de Firebase). Requiere cuenta en console.anthropic.com con tarjeta cargada.
+- **Tesseract.js (OCR gratis, corre en el navegador):** sin costo, pero es OCR genérico sin contexto — necesitaría reglas manuales (regex) para distinguir los rangos horarios del resto del texto de la pantalla, y es más frágil ante reflejos, ángulos de foto, o cambios de layout en Oracle.
+
+**Decisión:** pausado por ahora, no es prioridad. Si se retoma, evaluar primero si Tesseract.js da resultados aceptables antes de pasar a una solución con costo recurrente.

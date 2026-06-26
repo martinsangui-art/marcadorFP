@@ -57,6 +57,15 @@ body.desktop .app{max-width:520px}
 .app-name{font-family:'Oswald',sans-serif;font-size:1.3rem;font-weight:700;margin:0;letter-spacing:1px;text-transform:uppercase}
 .sub{font-size:.65rem;opacity:.8;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);margin-top:1px}
 
+.liveClock{
+  display:flex;align-items:center;gap:7px;
+  background:var(--bolt);border:1.5px solid var(--line);border-radius:4px;
+  padding:7px 12px;
+}
+.liveClock-led{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 6px var(--lime);animation:liveClockBlink 2s steps(2) infinite}
+@keyframes liveClockBlink{50%{opacity:.35}}
+#liveClockTime{font-family:'Share Tech Mono',monospace;font-size:1rem;color:var(--lime);letter-spacing:.5px;font-variant-numeric:tabular-nums}
+
 .toolbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .btn{
   font-family:'Oswald',sans-serif;font-weight:600;font-size:.74rem;
@@ -183,4 +192,6 @@ input[type=number],input[type=time],input[type=text],select{
 @media (max-width:380px){
   .seg-val{font-size:1.35rem}
   .pill{min-width:64px;font-size:.82rem}
+  .liveClock{padding:5px 9px}
+  #liveClockTime{font-size:.88rem}
 }
