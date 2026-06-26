@@ -103,15 +103,19 @@ function getNotified(){ try{ const d=JSON.parse(localStorage.getItem(NOTIFIED_KE
 function markNotified(flag){ const d=getNotified(); d[flag]=true; localStorage.setItem(NOTIFIED_KEY, JSON.stringify(d)) }
 
 function canNotify(){ return 'Notification' in window && Notification.permission==='granted' }
-function fireNotification(title,body){
+async function fireNotification(title,body){
   if(!canNotify()) return;
   try{
-    if(navigator.serviceWorker && navigator.serviceWorker.ready){
-      navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,{body,icon:'assets/icons/icon-192.png',tag:'jam7-alert'}));
-    } else {
-      new Notification(title,{body});
+    if('serviceWorker' in navigator){
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(title,{body,icon:'assets/icons/icon-192.png',tag:'jam7-alert'});
+      return;
     }
-  }catch(e){/* silencioso: si falla, el banner visual ya cumplió su función */}
+    new Notification(title,{body});
+  }catch(e){
+    console.warn('JAM7: no se pudo mostrar la notificación del sistema (queda el banner visual igual).', e);
+    try{ new Notification(title,{body}); }catch(e2){ console.warn('JAM7: fallback de Notification también falló.', e2); }
+  }
 }
 
 function setBanner(kind,text){
@@ -186,6 +190,9 @@ function startAlertLoop(){
   checkAlerts();
   if(alertTimer) clearInterval(alertTimer);
   alertTimer=setInterval(checkAlerts, 60*1000);
+  // Los navegadores frenan los timers cuando la pestaña no está visible (ahorro de batería).
+  // Para mitigarlo, forzamos un chequeo inmediato cada vez que la pestaña vuelve a primer plano.
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ checkAlerts(); } });
 }
 
 function updateNotifUI(){

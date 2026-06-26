@@ -84,3 +84,9 @@ No hace falta leer el código para mantener este proyecto. Lo que hace falta es 
 
 - **Feriados:** la lista vive en `app.js`, constante `HOLIDAYS`. Hay que agregar los feriados de cada año nuevo a mano (verificar fechas oficiales, no son siempre las mismas — algunos se trasladan a lunes).
 - **Techo de seguridad de 20:00** en el cálculo de salida sugerida: es un clamp interno que no debería activarse en la práctica. Si en algún momento se define una política de horas extra o jornada máxima, este es el lugar a revisar (`OUT_MAX` en `app.js`, aunque hoy no se usa para bloquear nada, solo queda documentado como referencia).
+
+## Decisión registrada: notificaciones sin servidor (por ahora)
+
+Las alertas (margen de ingreso, hora de salida sugerida) usan `setInterval` + Notification API del navegador — **sin backend, sin push real**. Limitación conocida y aceptada: si la pestaña/app está en segundo plano por mucho tiempo o el dispositivo está bloqueado, el chequeo periódico no corre de forma confiable (los navegadores lo frenan para ahorrar batería). Se mitigó agregando un re-chequeo inmediato cada vez que la app vuelve a primer plano (`visibilitychange`), que cubre el caso real más común: abrís la app para marcar tu egreso y ahí mismo te avisa si corresponde.
+
+**Alternativa evaluada y descartada (por ahora):** notificaciones push reales vía Firebase Cloud Messaging u otro servidor. Se descartó porque requiere migrar de "todo en localStorage" a una base de datos compartida con backend — cambio de arquitectura significativo para el tamaño del problema (uso informal entre pocas personas). Si en el futuro la deuda de horas se vuelve un problema recurrente y el fix liviano no alcanza, revisar esta decisión.
