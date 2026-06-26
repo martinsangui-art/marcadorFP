@@ -22,7 +22,7 @@
     <div class="brand">
       <div class="logo">7</div>
       <div class="brand-txt">
-        <h1 class="app-name">JAM7</h1>
+        <h1 class="app-name" id="greeting">JAM7</h1>
         <div class="sub" id="weekSub">Marcador semanal</div>
       </div>
     </div>
@@ -73,6 +73,18 @@
   <footer class="foot">// jam7 — running total</footer>
 </div>
 
+<!-- Nombre (primera vez) -->
+<div class="modal" id="nameModal" hidden>
+  <div class="panel">
+    <h3>¿Cómo te llamamos?</h3>
+    <div class="help">Lo usamos para saludarte. Queda guardado solo en este dispositivo.</div>
+    <input type="text" id="nameInput" placeholder="Tu nombre" maxlength="20" style="margin:8px 0">
+    <div class="modal-actions">
+      <button class="btn lime small" id="saveNameBtn">Listo</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal edición manual -->
 <div class="modal" id="timeModal" hidden>
   <div class="panel">
@@ -117,6 +129,11 @@
       <div>
         <label class="muted">Color de acento
           <select id="accentSel"><option value="lime">Lima</option><option value="amber">Ámbar</option><option value="cyan">Cian</option><option value="mono">Mono</option></select>
+        </label>
+      </div>
+      <div>
+        <label class="muted">Tu nombre
+          <input type="text" id="nameSettingsInput" maxlength="20" placeholder="Tu nombre">
         </label>
       </div>
       <div>

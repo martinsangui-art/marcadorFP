@@ -7,6 +7,7 @@ const HOLIDAYS=new Set([
   "2026-01-01","2026-02-16","2026-02-17","2026-03-24","2026-04-02","2026-04-03","2026-05-01","2026-05-25","2026-06-15","2026-06-20","2026-07-09","2026-08-17","2026-10-12","2026-11-23","2026-12-08","2026-12-25"
 ]);
 const STORAGE_KEY="jam7_v6_state"; const RO_KEY="jam7_readonly_v1"; const SETTINGS_KEY="jam7_settings_v3"; const HISTORY_KEY="jam7_history_v1";
+const NAME_KEY="jam7_username_v1";
 const NOTIFIED_KEY="jam7_notified_v1"; // qué avisos ya se dispararon hoy, para no repetir
 const IN_BOUNDS=[7*60+30,9*60+30]; const OUT_MIN=15*60+30; const OUT_MAX=20*60; // 15:30 piso real; 20:00 techo de seguridad, no normativo
 const IN_WARN_LEAD=20; // minutos antes del tope de ingreso (9:30) para empezar a avisar
@@ -26,6 +27,32 @@ function readonly(){return localStorage.getItem(RO_KEY)==="1"}
 
 function getSettings(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY))||{dailyTarget:"07:30",density:"comfy",accent:"lime"}}catch(e){return {dailyTarget:"07:30",density:"comfy",accent:"lime"}}}
 function setSettings(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));applySettings()}
+
+function getUserName(){ return (localStorage.getItem(NAME_KEY)||"").trim() }
+function setUserName(n){ n=(n||"").trim().slice(0,20); if(n) localStorage.setItem(NAME_KEY,n); applyGreeting(); }
+function greetingPhrase(){
+  const h=new Date().getHours();
+  if(h<12) return "Buen día";
+  if(h<19) return "Buenas tardes";
+  return "Buenas noches";
+}
+function applyGreeting(){
+  const name=getUserName();
+  const el=$('#greeting');
+  if(!el) return;
+  el.textContent = name ? `${greetingPhrase()}, ${name} 👋` : "JAM7";
+}
+function maybeAskName(){
+  if(getUserName()) return;
+  $('#nameModal').hidden=false; $('#nameModal').style.display='flex';
+  setTimeout(()=>$('#nameInput').focus(),80);
+}
+$('#saveNameBtn')?.addEventListener('click',()=>{
+  const v=$('#nameInput').value.trim();
+  if(v){ setUserName(v); }
+  $('#nameModal').style.display='none'; $('#nameModal').hidden=true;
+});
+$('#nameInput')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ $('#saveNameBtn').click(); } });
 function targetDayMin(){const s=getSettings().dailyTarget||"07:30";const [hh,mm]=s.split(":").map(Number);return hh*60+(mm||0)}
 
 function getState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||initWeek()}catch(e){return initWeek()}}
@@ -93,8 +120,16 @@ function setBanner(kind,text){
   b.hidden=false; b.className='alert-banner '+kind; t.textContent=text;
 }
 
+let pinnedBanner=null; let pinnedUntil=0;
+function setPinnedBanner(kind,text,durationMs){
+  pinnedBanner={kind,text}; pinnedUntil=Date.now()+durationMs;
+  setBanner(kind,text);
+}
+function pinnedActive(){ return pinnedBanner && Date.now()<pinnedUntil }
+
 // Corre cada vez que se renderiza Y cada 60s en segundo plano (ver startAlertLoop)
 function checkAlerts(){
+  if(pinnedActive()){ setBanner(pinnedBanner.kind, pinnedBanner.text); return }
   const data=getState();
   const idxToday=(new Date().getDay()+6)%7;
   if(idxToday<0||idxToday>4){ setBanner(null,null); return } // fin de semana
@@ -125,12 +160,19 @@ function checkAlerts(){
     const saldoPrevios = computeSaldoPrevios(data, idxToday);
     const exitMin = suggestedExitMinutes(ingresoMin, saldoPrevios);
     const minsToExit = exitMin-mins;
+    const esViernes = idxToday===4;
     if(mins>=exitMin){
-      setBanner('urgent','Llegó tu hora de salida sugerida ('+suggestedExitFromIngreso(ingresoMin,saldoPrevios)+').');
-      if(!notified.outReached){ fireNotification('JAM7','Llegó tu hora de salida sugerida.'); markNotified('outReached'); }
+      const msg = esViernes
+        ? 'Hoy es viernes: si salís ahora, la semana queda sin saldo recuperado. Tu salida de cierre es '+suggestedExitFromIngreso(ingresoMin,saldoPrevios)+'.'
+        : 'Llegó tu hora de salida sugerida ('+suggestedExitFromIngreso(ingresoMin,saldoPrevios)+').';
+      setBanner('urgent',msg);
+      if(!notified.outReached){ fireNotification('JAM7', esViernes ? 'Último día para recuperar saldo. Salida de cierre: '+suggestedExitFromIngreso(ingresoMin,saldoPrevios) : 'Llegó tu hora de salida sugerida.'); markNotified('outReached'); }
     } else if(minsToExit<=OUT_WARN_LEAD){
-      setBanner('warn',`Faltan ${minsToExit} min para tu salida sugerida (${suggestedExitFromIngreso(ingresoMin,saldoPrevios)}).`);
-      if(!notified.outWarn){ fireNotification('JAM7','Faltan '+minsToExit+' min para tu salida sugerida.'); markNotified('outWarn'); }
+      const msg = esViernes
+        ? `Faltan ${minsToExit} min para tu salida de cierre de semana (${suggestedExitFromIngreso(ingresoMin,saldoPrevios)}). Es viernes: no hay otro día para recuperar.`
+        : `Faltan ${minsToExit} min para tu salida sugerida (${suggestedExitFromIngreso(ingresoMin,saldoPrevios)}).`;
+      setBanner('warn',msg);
+      if(!notified.outWarn){ fireNotification('JAM7', esViernes ? 'Faltan '+minsToExit+' min para tu salida de cierre de semana.' : 'Faltan '+minsToExit+' min para tu salida sugerida.'); markNotified('outWarn'); }
     } else {
       setBanner(null,null);
     }
@@ -320,12 +362,28 @@ function mark(dayIdx,kind){
     if(!data.days[dayIdx]||!data.days[dayIdx].in){alert("Primero cargá el ingreso.");return}
     const inTime=new Date(data.days[dayIdx].in); if(d<=inTime){alert("Egreso debe ser después del ingreso.");return} }
   if(!data.days[dayIdx]) data.days[dayIdx]={};
-  data.days[dayIdx][kind]=d.toISOString(); saveState(data); render();
+  data.days[dayIdx][kind]=d.toISOString(); saveState(data);
   if(kind==='in'){
     const ingresoHoyMin = now.getHours()*60+now.getMinutes();
     const saldoPrevios = computeSaldoPrevios(data,dayIdx);
-    showToast("Salida sugerida: "+suggestedExitFromIngreso(ingresoHoyMin, saldoPrevios));
+    const sugerida = suggestedExitFromIngreso(ingresoHoyMin, saldoPrevios);
+    const PIN_MS = 5*60*1000; // 5 minutos visible antes de que las reglas normales puedan retomar el banner
+    if(dayIdx===4){
+      // Viernes: aviso especial al marcar ingreso, con todo el día por delante para reaccionar
+      if(saldoPrevios<0){
+        setPinnedBanner('urgent', `Hoy es viernes y debés ${fmtMinutes(Math.abs(saldoPrevios))} de la semana. Tu salida de cierre es ${sugerida}.`, PIN_MS);
+        fireNotification('JAM7', `Viernes: debés ${fmtMinutes(Math.abs(saldoPrevios))}. Salida de cierre: ${sugerida}.`);
+      } else if(saldoPrevios>0){
+        setPinnedBanner('good', `Vas con ${fmtMinutes(saldoPrevios)} a favor. Si salís 15:30 hoy, te sobran. Tip: la próxima semana repartilos mejor en los días en vez de juntarlos para el viernes.`, PIN_MS);
+        showToast(`Vas ${fmtMinutes(saldoPrevios)} a favor 🎉 — salida de cierre: ${sugerida}`);
+      } else {
+        showToast("Salida sugerida (cierre de semana): "+sugerida);
+      }
+    } else {
+      showToast("Salida sugerida: "+sugerida);
+    }
   }
+  render();
 }
 
 // Exports
@@ -378,7 +436,8 @@ $('#historyBtn').onclick=()=>{
 $('#closeHistory').onclick=()=>{ $('#historyModal').style.display='none'; $('#historyModal').hidden=true; };
 
 // Settings
-$('#settingsBtn').onclick=()=>{ const s=getSettings(); $('#settingsModal').hidden=false; $('#settingsModal').style.display='flex'; $('#readonlyToggle').checked=readonly(); $('#dailyTarget').value=s.dailyTarget||"07:30"; $('#densitySel').value=s.density||"comfy"; $('#accentSel').value=s.accent||"lime"; updateNotifUI(); };
+$('#settingsBtn').onclick=()=>{ const s=getSettings(); $('#settingsModal').hidden=false; $('#settingsModal').style.display='flex'; $('#readonlyToggle').checked=readonly(); $('#dailyTarget').value=s.dailyTarget||"07:30"; $('#densitySel').value=s.density||"comfy"; $('#accentSel').value=s.accent||"lime"; $('#nameSettingsInput').value=getUserName(); updateNotifUI(); };
+$('#nameSettingsInput')?.addEventListener('change',(e)=>{ setUserName(e.target.value); });
 $('#closeSettings').onclick=()=>{ $('#settingsModal').style.display='none'; $('#settingsModal').hidden=true };
 $('#readonlyToggle').onchange=e=>{ localStorage.setItem(RO_KEY, e.target.checked?'1':'0'); applyReadonly(); };
 $('#dailyTarget').addEventListener('change',e=>{ const s=getSettings(); s.dailyTarget=e.target.value||"07:30"; setSettings(s); render(); });
@@ -400,4 +459,4 @@ $('#resetBtn').onclick=()=>{ if(confirm("¿Reiniciar semana? (esto NO borra el h
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}) }) }
 
 window.addEventListener('resize',()=>{ detectDevice(); applyReadonly(); });
-(function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); })();
+(function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); applyGreeting(); maybeAskName(); })();

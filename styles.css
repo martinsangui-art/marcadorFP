@@ -38,7 +38,7 @@ a.skip:focus{left:8px;top:8px;background:var(--lime);color:var(--bg);padding:6px
 :focus-visible{outline:2px solid var(--lime);outline-offset:2px}
 
 .app{max-width:460px;margin:0 auto;padding:16px 14px 28px}
-body.desktop .app{max-width:920px}
+body.desktop .app{max-width:520px}
 
 .topbar{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px}
@@ -95,7 +95,6 @@ body.desktop .app{max-width:920px}
 .seg-val.neu{color:var(--text)}
 
 .daysGrid{display:grid;grid-template-columns:1fr;gap:10px}
-body.desktop .daysGrid{grid-template-columns:1fr 1fr}
 
 .dayCard{
   background:var(--panel);border:1px solid var(--line);border-radius:8px;
@@ -172,8 +171,11 @@ input[type=number],input[type=time],select{
   border:1px solid var(--line);
 }
 .alert-banner.info{background:rgba(94,209,224,.08);border-color:rgba(94,209,224,.35);color:#9FE3EC}
+.alert-banner.good{background:rgba(201,242,74,.1);border-color:rgba(201,242,74,.4);color:var(--lime)}
 .alert-banner.warn{background:rgba(242,162,60,.1);border-color:rgba(242,162,60,.4);color:var(--amber)}
 .alert-banner.urgent{background:rgba(224,88,74,.12);border-color:rgba(224,88,74,.45);color:var(--red)}
+.alert-banner.urgent::before{content:"⚠ ";font-weight:800}
+.alert-banner.good::before{content:"🎉 "}
 
 @media (max-width:380px){
   .seg-val{font-size:1.4rem}
