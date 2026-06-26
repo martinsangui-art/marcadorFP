@@ -84,3 +84,34 @@ async function pullFromCloudOnce(){
     if(typeof applyGreeting==='function') applyGreeting();
   }catch(e){ fbLog('No se pudo traer datos de la nube (se sigue trabajando local):', e); }
 }
+
+// Pide permiso de notificación + token de FCM, y lo guarda en Firestore para que
+// la Cloud Function (lado servidor) sepa a qué dispositivo mandarle el push.
+async function registerPushToken(){
+  if(!('Notification' in window) || !('serviceWorker' in navigator)){
+    fbLog('Este navegador no soporta push.');
+    return {ok:false, reason:'unsupported'};
+  }
+  try{
+    const perm = await Notification.requestPermission();
+    if(perm!=='granted') return {ok:false, reason:'denied'};
+
+    // Usamos el MISMO service worker que ya cachea la app offline — un sitio solo
+    // puede tener un service worker activo, así que FCM se registra sobre ese mismo.
+    const reg = await navigator.serviceWorker.ready;
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg});
+
+    if(!token) return {ok:false, reason:'no-token'};
+
+    const ref = userDocRef();
+    if(ref){
+      await ref.set({fcmToken: token, fcmTokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()}, {merge:true});
+      fbLog('Token de notificaciones guardado.');
+    }
+    return {ok:true};
+  }catch(e){
+    fbLog('Error registrando token de push:', e);
+    return {ok:false, reason:'error', error:e};
+  }
+}

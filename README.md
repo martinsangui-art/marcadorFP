@@ -27,6 +27,8 @@ Esto es lo que el sistema tiene que cumplir. Si algo en la app contradice esto, 
   - Entrás 8:30, venís debiendo 30 min de días anteriores → salís 16:30.
   - Entrás 8:30, venís con 20 min a favor → salís 15:40.
 
+- **Salida fija semanal (opcional):** los lunes, la app pregunta si preferís fijar una hora de salida pareja para toda la semana (15:30 o 16:00) en vez de que varíe según el ingreso de cada día. Si se elige, esa hora reemplaza el cálculo dinámico todos los días de esa semana — incluida la sugerencia y las alertas. Si no se elige (o si se empieza a usar la app un día que no es lunes), el valor por defecto es **15:30**. Importante: con hora fija activa, la deuda por llegar tarde **deja de autocompensarse** corriendo la salida — solo queda reflejada en el saldo semanal del scoreboard.
+
 - Feriados nacionales argentinos: bloquean marcación ese día (lista hardcodeada en `app.js`, hay que actualizarla a mano cada año — ver sección de mantenimiento).
 
 ---

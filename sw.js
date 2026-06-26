@@ -1,5 +1,25 @@
-// JAM7 v6.2 SW — cache bust + notification click handler
-const CACHE='jam7-v6-2';
+// JAM7 v7.0 SW — cache offline + notification click handler + Firebase Cloud Messaging
+// IMPORTANTE: solo puede haber UN service worker por sitio. Por eso FCM no tiene
+// su propio archivo separado (firebase-messaging-sw.js) — todo vive acá junto.
+importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: "AIzaSyCICPlzGFljBQEZIafB7_LFzQ-HiMYNj5k",
+  authDomain: "jam7-marcador.firebaseapp.com",
+  projectId: "jam7-marcador",
+  storageBucket: "jam7-marcador.firebasestorage.app",
+  messagingSenderId: "109218075671",
+  appId: "1:109218075671:web:a8100c9d715d5c7a6ef852"
+});
+const messaging = firebase.messaging();
+messaging.onBackgroundMessage((payload)=>{
+  const title = payload.notification?.title || 'JAM7';
+  const body = payload.notification?.body || '';
+  self.registration.showNotification(title, {body, icon:'assets/icons/icon-192.png', tag:'jam7-alert'});
+});
+
+const CACHE='jam7-v7-0';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png','./assets/icons/apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(k=>k!==CACHE&&caches.delete(k))))) });
