@@ -8,6 +8,7 @@ const HOLIDAYS=new Set([
 ]);
 const STORAGE_KEY="jam7_v6_state"; const RO_KEY="jam7_readonly_v1"; const SETTINGS_KEY="jam7_settings_v3"; const HISTORY_KEY="jam7_history_v1";
 const NAME_KEY="jam7_username_v1";
+const INSTALL_TIP_DISMISSED_KEY="jam7_install_tip_dismissed_v1";
 const NOTIFIED_KEY="jam7_notified_v1"; // qué avisos ya se dispararon hoy, para no repetir
 const IN_BOUNDS=[7*60+30,9*60+30]; const OUT_MIN=15*60+30; const OUT_MAX=20*60; // 15:30 piso real; 20:00 techo de seguridad, no normativo
 const IN_WARN_LEAD=20; // minutos antes del tope de ingreso (9:30) para empezar a avisar
@@ -254,7 +255,7 @@ $('#notifBtn')?.addEventListener('click', async ()=>{
   else { showToast('No se pudo activar. Probá de nuevo en unos segundos.'); }
 });
 
-function detectDevice(){const ua=navigator.userAgent||"";const mobile=/Mobi|Android|iPhone|iPad|iPod/i.test(ua)||window.matchMedia("(pointer:coarse)").matches||window.innerWidth<=600;document.body.classList.toggle('desktop',!mobile);const isIOS=/iPhone|iPad|iPod/i.test(ua);$('#iosInstall').hidden=!isIOS}
+function detectDevice(){const ua=navigator.userAgent||"";const mobile=/Mobi|Android|iPhone|iPad|iPod/i.test(ua)||window.matchMedia("(pointer:coarse)").matches||window.innerWidth<=600;document.body.classList.toggle('desktop',!mobile);updateInstallTip();}
 function applySettings(){const s=getSettings();const root=document.documentElement;root.classList.remove('accent-amber','accent-cyan','accent-mono');if(s.accent&&s.accent!=='lime')root.classList.add('accent-'+s.accent);const app=$('#app');app.classList.remove('density-compact','density-comfy');app.classList.add('density-'+(s.density||'comfy'))}
 
 function showToast(msg){const t=toast();t.textContent=msg;t.style.display='block';setTimeout(()=>{t.style.display='none';t.textContent=''},2200)}
@@ -499,11 +500,44 @@ $('#accentSel').addEventListener('change',e=>{ const s=getSettings(); s.accent=e
 
 function applyReadonly(){ const on=readonly(); document.querySelectorAll('.btn.good,.btn.primary,.btn.warn,.pill').forEach(el=>{ on?el.setAttribute('disabled',''):el.removeAttribute('disabled') }) }
 
-// Install / iOS tip
-window.addEventListener('beforeinstallprompt',(e)=>{e.preventDefault();deferredPrompt=e;$('#installBtn').style.display='inline-block'});
+// Install / tip de "agregar a inicio" — adaptado a iOS, Android o Desktop
+function isStandalone(){ return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true }
+window.addEventListener('beforeinstallprompt',(e)=>{e.preventDefault();deferredPrompt=e;$('#installBtn').style.display='inline-block';updateInstallTip();});
 $('#installBtn').addEventListener('click',async()=>{ if(!deferredPrompt)return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null; $('#installBtn').style.display='none' });
-function hideInstallIfStandalone(){ const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true; if(isStandalone) $('#installBtn').style.display='none' }
-$('#hideIosTip').addEventListener('click',()=>{$('#iosInstall').hidden=true});
+function hideInstallIfStandalone(){ if(isStandalone()) $('#installBtn').style.display='none' }
+
+function updateInstallTip(){
+  const tip=$('#installTip'), txt=$('#installTipText');
+  if(!tip||!txt) return;
+
+  if(isStandalone()){ tip.hidden=true; return; } // ya instalada, no hay nada que decir
+  if(localStorage.getItem(INSTALL_TIP_DISMISSED_KEY)==='1'){ tip.hidden=true; return; } // ya lo vio y lo cerró
+
+  const ua=navigator.userAgent||"";
+  const isIOS=/iPhone|iPad|iPod/i.test(ua);
+  const isAndroid=/Android/i.test(ua);
+
+  if(isIOS){
+    txt.innerHTML='<strong>Instalar en iPhone:</strong> abrí esta página en Safari → tocá el ícono de compartir <span aria-hidden="true">⬆️</span> → "Agregar a inicio".';
+  } else if(isAndroid){
+    if(deferredPrompt){
+      txt.innerHTML='<strong>Instalar en Android:</strong> tocá el botón "Instalar" arriba, o usá el menú ⋮ del navegador → "Instalar app" / "Agregar a pantalla de inicio".';
+    } else {
+      txt.innerHTML='<strong>Instalar en Android:</strong> abrí el menú ⋮ del navegador (arriba a la derecha) → "Instalar app" o "Agregar a pantalla de inicio".';
+    }
+  } else {
+    // Desktop: no es el caso de uso principal, pero igual damos la instrucción genérica
+    txt.innerHTML='<strong>Instalar en la compu:</strong> buscá el ícono de instalar en la barra de direcciones del navegador (Chrome/Edge), o el menú ⋮ → "Instalar JAM7".';
+  }
+  tip.hidden=false;
+}
+$('#hideInstallTip').addEventListener('click',()=>{ localStorage.setItem(INSTALL_TIP_DISMISSED_KEY,'1'); $('#installTip').hidden=true; });
+$('#showInstallTipBtn')?.addEventListener('click',()=>{
+  localStorage.removeItem(INSTALL_TIP_DISMISSED_KEY);
+  updateInstallTip();
+  $('#settingsModal').style.display='none'; $('#settingsModal').hidden=true;
+  $('#installTip')?.scrollIntoView({behavior:'smooth', block:'start'});
+});
 
 // Reset
 $('#resetBtn').onclick=()=>{ if(confirm("¿Reiniciar semana? (esto NO borra el historial ni el backup)")){ let data=getState(); archiveWeekIfChanged(data); localStorage.removeItem(STORAGE_KEY); const d=initWeek(); saveState(d); render(); } };

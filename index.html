@@ -42,9 +42,9 @@
     </nav>
   </header>
 
-  <section class="ios-install" id="iosInstall" hidden>
-    <strong>Tip iPhone:</strong> Abrí en Safari → compartir → <b>“Agregar a inicio”</b>.
-    <button class="btn small" id="hideIosTip">Entendido</button>
+  <section class="ios-install" id="installTip" hidden>
+    <span id="installTipText"></span>
+    <button class="btn small" id="hideInstallTip">Entendido</button>
   </section>
 
   <main id="main">
@@ -159,6 +159,11 @@
         <label class="muted">Notificaciones
           <button class="btn small" id="notifBtn" type="button">Activar avisos</button>
           <span class="muted smalltxt" id="notifStatus">Avisa cuando se acerca el límite de ingreso o llega tu salida sugerida — funciona aunque tengas la app cerrada.</span>
+        </label>
+      </div>
+      <div>
+        <label class="muted">Instalación
+          <button class="btn small" id="showInstallTipBtn" type="button">Ver cómo instalar la app</button>
         </label>
       </div>
     </div>
