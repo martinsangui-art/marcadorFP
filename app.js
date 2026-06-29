@@ -371,13 +371,28 @@ function closeSheet(){ $('#sheetBackdrop').style.display='none'; $('#sheetBackdr
 $('#sheetClose').onclick=closeSheet;
 $('#sheetBackdrop').addEventListener('pointerdown',(e)=>{ if(e.target.id==='sheetBackdrop') closeSheet() });
 
+// Advertencia (informativa, no bloqueante) al marcar/editar un egreso que deja la semana en negativo.
+// Devuelve true si corresponde continuar (no había problema, o el usuario confirmó igual), false si canceló.
+function confirmSaldoNegativoSiCorresponde(dayIdx, data, inIso, outIso){
+  const minutosHoyProyectado = minutesBetween(inIso, outIso);
+  const saldoPrevios = computeSaldoPrevios(data, dayIdx);
+  const saldoProyectado = saldoPrevios + (minutosHoyProyectado - targetDayMin());
+  if(saldoProyectado>=0) return true;
+  const esViernes = dayIdx===4;
+  const msg = esViernes
+    ? `Es viernes: si marcás ahora, la semana cierra con ${fmtMinutes(saldoProyectado)} y ya no hay otro día para recuperarlo. ¿Marcar igual?`
+    : `Si marcás ahora, vas a quedar con ${fmtMinutes(saldoProyectado)} en la semana. Todavía tenés días para recuperarlo. ¿Marcar igual?`;
+  return confirm(msg);
+}
+
 function setManual(dayIdx,field,hh,mm){
   let data=getState(); const s=new Date(data.weekStart); const d=new Date(s); d.setDate(s.getDate()+dayIdx); d.setHours(hh,mm,0,0);
   const mins=hh*60+mm;
   if(field==='in'){ if(mins<IN_BOUNDS[0]||mins>IN_BOUNDS[1]){alert("Ingreso permitido: 07:30–09:30");return} }
   else { if(mins<OUT_MIN){alert("Egreso no permitido antes de las 15:30");return}
          if(!data.days[dayIdx]||!data.days[dayIdx].in){alert("Primero cargá el ingreso.");return}
-         const inTime=new Date(data.days[dayIdx].in); if(d<=inTime){alert("Egreso debe ser después del ingreso.");return} }
+         const inTime=new Date(data.days[dayIdx].in); if(d<=inTime){alert("Egreso debe ser después del ingreso.");return}
+         if(!confirmSaldoNegativoSiCorresponde(dayIdx, data, data.days[dayIdx].in, d.toISOString())) return; }
   if(!data.days[dayIdx]) data.days[dayIdx]={};
   data.days[dayIdx][field]=d.toISOString(); saveState(data); render();
 }
@@ -402,7 +417,8 @@ $('#saveEdit').onclick=()=>{
   if(editCtx.field==='in'){ if(mins<IN_BOUNDS[0]||mins>IN_BOUNDS[1]){alert("Ingreso permitido: 07:30–09:30");return} }
   else { if(mins<OUT_MIN){alert("Egreso no permitido antes de las 15:30");return}
          if(!data.days[editCtx.dayIdx]||!data.days[editCtx.dayIdx].in){alert("Primero cargá el ingreso.");return}
-         const inTime=new Date(data.days[editCtx.dayIdx].in); if(d<=inTime){alert("Egreso debe ser después del ingreso.");return} }
+         const inTime=new Date(data.days[editCtx.dayIdx].in); if(d<=inTime){alert("Egreso debe ser después del ingreso.");return}
+         if(!confirmSaldoNegativoSiCorresponde(editCtx.dayIdx, data, data.days[editCtx.dayIdx].in, d.toISOString())) return; }
   if(!data.days[editCtx.dayIdx]) data.days[editCtx.dayIdx]={};
   data.days[editCtx.dayIdx][editCtx.field]=d.toISOString(); saveState(data);
   $('#timeModal').style.display='none'; $('#timeModal').hidden=true; editCtx=null; render();
@@ -417,7 +433,8 @@ function mark(dayIdx,kind){
   if(kind==='in'){ if(mins<IN_BOUNDS[0]||mins>IN_BOUNDS[1]){alert("Ingreso fuera de horario permitido (07:30–09:30). Usá edición manual si necesitás registrar una excepción.");return} }
   if(kind==='out'){ if(mins<OUT_MIN){alert("Egreso no permitido antes de las 15:30");return}
     if(!data.days[dayIdx]||!data.days[dayIdx].in){alert("Primero cargá el ingreso.");return}
-    const inTime=new Date(data.days[dayIdx].in); if(d<=inTime){alert("Egreso debe ser después del ingreso.");return} }
+    const inTime=new Date(data.days[dayIdx].in); if(d<=inTime){alert("Egreso debe ser después del ingreso.");return}
+    if(!confirmSaldoNegativoSiCorresponde(dayIdx, data, data.days[dayIdx].in, d.toISOString())) return; }
   if(!data.days[dayIdx]) data.days[dayIdx]={};
   data.days[dayIdx][kind]=d.toISOString(); saveState(data);
   if(kind==='in'){
