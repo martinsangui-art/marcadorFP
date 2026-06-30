@@ -19,7 +19,7 @@ messaging.onBackgroundMessage((payload)=>{
   self.registration.showNotification(title, {body, icon:'assets/icons/icon-192.png', tag:'jam7-alert'});
 });
 
-const CACHE='jam7-v9-audit';
+const CACHE='jam7-v9-sonido';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png','./assets/icons/apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(k=>k!==CACHE&&caches.delete(k))))) });

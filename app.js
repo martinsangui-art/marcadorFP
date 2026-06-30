@@ -26,6 +26,57 @@ function minutesBetween(a,b){return Math.max(0,Math.round((b-a)/60000))}
 function vibrate(ms=15){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 function readonly(){return localStorage.getItem(RO_KEY)==="1"}
 
+// --- Sonidos (sintetizados con Web Audio API, sin archivos externos) ---
+const SOUND_KEY="jam7_sound_enabled_v1";
+function soundEnabled(){ return localStorage.getItem(SOUND_KEY)!=='0' } // activado por defecto
+function setSoundEnabled(on){ localStorage.setItem(SOUND_KEY, on?'1':'0'); }
+
+let _audioCtx=null;
+function getAudioCtx(){
+  if(_audioCtx) return _audioCtx;
+  try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
+  return _audioCtx;
+}
+
+// Tono simple: frecuencia, duración (seg), tipo de onda, volumen pico, retardo de inicio
+function playTone(freq, duration, type='sine', peakGain=0.12, startTime=0){
+  const ctx=getAudioCtx();
+  if(!ctx) return;
+  if(ctx.state==='suspended') ctx.resume().catch(()=>{});
+  const osc=ctx.createOscillator();
+  const gain=ctx.createGain();
+  osc.type=type;
+  osc.frequency.value=freq;
+  const t0=ctx.currentTime+startTime;
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(peakGain, t0+0.015); // ataque rápido, evita "click" seco
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0+duration); // caída suave
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(t0); osc.stop(t0+duration+0.02);
+}
+
+// Ingreso: dos notas ascendentes cortas, sensación de "switch encendido"
+function playSoundIn(){
+  if(!soundEnabled()) return;
+  playTone(523.25, 0.09, 'sine', 0.11, 0);    // C5
+  playTone(783.99, 0.13, 'sine', 0.11, 0.08); // G5
+}
+// Egreso: dos notas descendentes, sensación de "cierre"
+function playSoundOut(){
+  if(!soundEnabled()) return;
+  playTone(659.25, 0.09, 'sine', 0.11, 0);    // E5
+  playTone(440.00, 0.16, 'sine', 0.11, 0.08); // A4
+}
+// Alerta: dos (o tres si es urgente) tonos tipo "sirena suave", coherente con panel industrial
+function playSoundAlert(urgent){
+  if(!soundEnabled()) return;
+  const f1 = urgent ? 880 : 660;
+  const f2 = urgent ? 660 : 523.25;
+  playTone(f1, 0.14, 'triangle', 0.13, 0);
+  playTone(f2, 0.14, 'triangle', 0.13, 0.16);
+  if(urgent){ playTone(f1, 0.14, 'triangle', 0.13, 0.32); }
+}
+
 function getSettings(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY))||{dailyTarget:"07:30",density:"comfy",accent:"lime"}}catch(e){return {dailyTarget:"07:30",density:"comfy",accent:"lime"}}}
 function setSettings(s){localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));applySettings();if(typeof pushToCloud==='function')pushToCloud();}
 
@@ -119,10 +170,17 @@ async function fireNotification(title,body){
   }
 }
 
+let _lastBannerKind=null;
 function setBanner(kind,text){
   const b=$('#alertBanner'), t=$('#alertBannerText');
-  if(!text){ b.hidden=true; return }
+  if(!text){ b.hidden=true; _lastBannerKind=null; return }
   b.hidden=false; b.className='alert-banner '+kind; t.textContent=text;
+  // Sonido solo en la transición hacia warn/urgent (no se repite mientras la alerta sigue activa,
+  // ni suena en good/info que son tono positivo/neutral).
+  if((kind==='warn'||kind==='urgent') && _lastBannerKind!==kind){
+    playSoundAlert(kind==='urgent');
+  }
+  _lastBannerKind=kind;
 }
 
 let pinnedBanner=null; let pinnedUntil=0;
@@ -412,6 +470,7 @@ function mark(dayIdx,kind){
     if(!confirmSaldoNegativoSiCorresponde(dayIdx, data, data.days[dayIdx].in, d.toISOString())) return; }
   if(!data.days[dayIdx]) data.days[dayIdx]={};
   data.days[dayIdx][kind]=d.toISOString(); saveState(data);
+  if(kind==='in') playSoundIn(); else playSoundOut();
   if(kind==='in'){
     const ingresoHoyMin = now.getHours()*60+now.getMinutes();
     const saldoPrevios = computeSaldoPrevios(data,dayIdx);
@@ -485,7 +544,8 @@ $('#historyBtn').onclick=()=>{
 $('#closeHistory').onclick=()=>{ $('#historyModal').style.display='none'; $('#historyModal').hidden=true; };
 
 // Settings
-$('#settingsBtn').onclick=()=>{ const s=getSettings(); $('#settingsModal').hidden=false; $('#settingsModal').style.display='flex'; $('#readonlyToggle').checked=readonly(); $('#dailyTarget').value=s.dailyTarget||"07:30"; $('#densitySel').value=s.density||"comfy"; $('#accentSel').value=s.accent||"lime"; $('#nameSettingsInput').value=getUserName(); updateNotifUI(); };
+$('#settingsBtn').onclick=()=>{ const s=getSettings(); $('#settingsModal').hidden=false; $('#settingsModal').style.display='flex'; $('#readonlyToggle').checked=readonly(); $('#dailyTarget').value=s.dailyTarget||"07:30"; $('#densitySel').value=s.density||"comfy"; $('#accentSel').value=s.accent||"lime"; $('#nameSettingsInput').value=getUserName(); $('#soundToggle').checked=soundEnabled(); updateNotifUI(); };
+$('#soundToggle')?.addEventListener('change',(e)=>{ setSoundEnabled(e.target.checked); if(e.target.checked) playSoundIn(); });
 $('#nameSettingsInput')?.addEventListener('change',(e)=>{ setUserName(e.target.value); });
 $('#closeSettings').onclick=()=>{ $('#settingsModal').style.display='none'; $('#settingsModal').hidden=true };
 $('#readonlyToggle').onchange=e=>{ localStorage.setItem(RO_KEY, e.target.checked?'1':'0'); applyReadonly(); };
@@ -541,4 +601,15 @@ $('#resetBtn').onclick=()=>{ if(confirm("¿Reiniciar semana? (esto NO borra el h
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}) }) }
 
 window.addEventListener('resize',()=>{ detectDevice(); applyReadonly(); });
+// El navegador bloquea el audio hasta la primera interacción real del usuario.
+// Destrabamos el AudioContext en el primer toque/click, así cuando llegue una alerta
+// disparada sola por el timer (sin interacción en ese momento), el sonido ya funciona.
+function unlockAudioOnce(){
+  getAudioCtx();
+  document.removeEventListener('pointerdown', unlockAudioOnce);
+  document.removeEventListener('keydown', unlockAudioOnce);
+}
+document.addEventListener('pointerdown', unlockAudioOnce, {once:true});
+document.addEventListener('keydown', unlockAudioOnce, {once:true});
+
 (function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); startLiveClock(); applyGreeting(); maybeAskName(); if(typeof initFirebaseSync==='function') initFirebaseSync(); })();
