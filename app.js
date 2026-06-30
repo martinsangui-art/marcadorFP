@@ -57,7 +57,7 @@ $('#nameInput')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ $('#save
 function targetDayMin(){const s=getSettings().dailyTarget||"07:30";const [hh,mm]=s.split(":").map(Number);return hh*60+(mm||0)}
 
 function getState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||initWeek()}catch(e){return initWeek()}}
-function initWeek(){const ws=startOfISOWeek(new Date()).toISOString();const data={weekStart:ws,days:[null,null,null,null,null],fixedExit:null};localStorage.setItem(STORAGE_KEY,JSON.stringify(data));return data}
+function initWeek(){const ws=startOfISOWeek(new Date()).toISOString();const data={weekStart:ws,days:[null,null,null,null,null]};localStorage.setItem(STORAGE_KEY,JSON.stringify(data));return data}
 function saveState(d){localStorage.setItem(STORAGE_KEY,JSON.stringify(d));if(typeof pushToCloud==='function')pushToCloud();}
 
 // --- Historial ---
@@ -84,40 +84,13 @@ function computeSaldoPrevios(data,idx){let s=0,tgt=targetDayMin();for(let i=0;i<
 //  - el saldo acumulado de días previos de la semana (saldoPreviosMin: + a favor, - en contra)
 // Regla: salida = ingreso_hoy + meta_diaria - saldo_previos (si venís a favor, restás; si venís en contra, sumás)
 // Piso normativo: nunca antes de las 15:30, sin importar cuánto saldo a favor tengas.
-// EXCEPCIÓN: si la semana tiene una hora fija elegida el lunes (fixedExit), esa hora
-// gana siempre y el cálculo dinámico no se usa — la deuda por llegar tarde deja de
-// autocompensarse vía hora de salida; solo queda reflejada en el saldo semanal.
-function getFixedExit(){
-  const data=getState();
-  return data && data.fixedExit ? data.fixedExit : null; // "15:30" | "16:00" | null
-}
-function setFixedExit(value){
-  let data=getState();
-  data.fixedExit=value; // "15:30" | "16:00"
-  saveState(data);
-  render();
-}
-function maybeAskFixedExit(){
-  const idxToday=(new Date().getDay()+6)%7;
-  if(idxToday!==0) return; // solo lunes
-  const data=getState();
-  if(data.fixedExit) return; // ya se eligió esta semana
-  $('#fixedExitModal').hidden=false; $('#fixedExitModal').style.display='flex';
-}
-$('#fixedExit1530')?.addEventListener('click',()=>{ setFixedExit('15:30'); $('#fixedExitModal').style.display='none'; $('#fixedExitModal').hidden=true; showToast('Salida fijada a las 15:30 toda la semana.'); });
-$('#fixedExit1600')?.addEventListener('click',()=>{ setFixedExit('16:00'); $('#fixedExitModal').style.display='none'; $('#fixedExitModal').hidden=true; showToast('Salida fijada a las 16:00 toda la semana.'); });
-$('#fixedExitSkip')?.addEventListener('click',()=>{ setFixedExit('15:30'); $('#fixedExitModal').style.display='none'; $('#fixedExitModal').hidden=true; });
 function suggestedExitFromIngreso(ingresoHoyMin, saldoPreviosMin){
-  const fixed=getFixedExit();
-  if(fixed) return fixed;
   const tgt=targetDayMin();
   const raw = ingresoHoyMin + tgt - saldoPreviosMin;
   const clamp = Math.max(raw, OUT_MIN);
   return `${pad(Math.floor(clamp/60))}:${pad(clamp%60)}`;
 }
 function suggestedExitMinutes(ingresoHoyMin, saldoPreviosMin){
-  const fixed=getFixedExit();
-  if(fixed){ const [hh,mm]=fixed.split(":").map(Number); return hh*60+mm; }
   const tgt=targetDayMin();
   const raw = ingresoHoyMin + tgt - saldoPreviosMin;
   return Math.max(raw, OUT_MIN);
@@ -374,7 +347,7 @@ $('#sheetBackdrop').addEventListener('pointerdown',(e)=>{ if(e.target.id==='shee
 // Advertencia (informativa, no bloqueante) al marcar/editar un egreso que deja la semana en negativo.
 // Devuelve true si corresponde continuar (no había problema, o el usuario confirmó igual), false si canceló.
 function confirmSaldoNegativoSiCorresponde(dayIdx, data, inIso, outIso){
-  const minutosHoyProyectado = minutesBetween(inIso, outIso);
+  const minutosHoyProyectado = minutesBetween(new Date(inIso), new Date(outIso));
   const saldoPrevios = computeSaldoPrevios(data, dayIdx);
   const saldoProyectado = saldoPrevios + (minutosHoyProyectado - targetDayMin());
   if(saldoProyectado>=0) return true;
@@ -566,4 +539,4 @@ $('#resetBtn').onclick=()=>{ if(confirm("¿Reiniciar semana? (esto NO borra el h
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}) }) }
 
 window.addEventListener('resize',()=>{ detectDevice(); applyReadonly(); });
-(function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); startLiveClock(); applyGreeting(); maybeAskName(); if(typeof initFirebaseSync==='function') initFirebaseSync(); maybeAskFixedExit(); })();
+(function init(){ hideInstallIfStandalone(); render(); applyReadonly(); startAlertLoop(); startLiveClock(); applyGreeting(); maybeAskName(); if(typeof initFirebaseSync==='function') initFirebaseSync(); })();

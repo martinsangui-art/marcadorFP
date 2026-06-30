@@ -63,11 +63,7 @@ function computeSaldoPrevios(days, idx, tgt) {
   return s;
 }
 
-function suggestedExitMinutes(ingresoHoyMin, saldoPreviosMin, tgt, fixedExit) {
-  if (fixedExit) {
-    const [hh, mm] = fixedExit.split(":").map(Number);
-    return hh * 60 + mm;
-  }
+function suggestedExitMinutes(ingresoHoyMin, saldoPreviosMin, tgt) {
   const raw = ingresoHoyMin + tgt - saldoPreviosMin;
   return Math.max(raw, OUT_MIN);
 }
@@ -128,7 +124,7 @@ exports.checkAlertsAndNotify = onSchedule(
       } else if (rec.in && !rec.out) {
         const ingresoMin = minutesFromISO(rec.in, TZ);
         const saldoPrevios = computeSaldoPrevios(days, idxToday, tgt);
-        const exitMin = suggestedExitMinutes(ingresoMin, saldoPrevios, tgt, state.fixedExit);
+        const exitMin = suggestedExitMinutes(ingresoMin, saldoPrevios, tgt);
         const minsToExit = exitMin - mins;
         const esViernes = idxToday === 4;
 
