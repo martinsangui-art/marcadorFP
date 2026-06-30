@@ -1,4 +1,4 @@
-// JAM7 v6.0 — marcador (scoreboard) + historial + import/export
+// JAM7 v9 — Firebase + push real + panel industrial + alertas completas
 const WEEKDAYS=["Lunes","Martes","Miércoles","Jueves","Viernes"];
 const HOLIDAYS=new Set([
   // 2025
@@ -10,7 +10,7 @@ const STORAGE_KEY="jam7_v6_state"; const RO_KEY="jam7_readonly_v1"; const SETTIN
 const NAME_KEY="jam7_username_v1";
 const INSTALL_TIP_DISMISSED_KEY="jam7_install_tip_dismissed_v1";
 const NOTIFIED_KEY="jam7_notified_v1"; // qué avisos ya se dispararon hoy, para no repetir
-const IN_BOUNDS=[7*60+30,9*60+30]; const OUT_MIN=15*60+30; const OUT_MAX=20*60; // 15:30 piso real; 20:00 techo de seguridad, no normativo
+const IN_BOUNDS=[7*60+30,9*60+30]; const OUT_MIN=15*60+30;
 const IN_WARN_LEAD=20; // minutos antes del tope de ingreso (9:30) para empezar a avisar
 const OUT_WARN_LEAD=10; // minutos antes de la salida sugerida para avisar
 const $=s=>document.querySelector(s);
@@ -194,9 +194,6 @@ function startAlertLoop(){
   checkAlerts();
   if(alertTimer) clearInterval(alertTimer);
   alertTimer=setInterval(checkAlerts, 60*1000);
-  // Los navegadores frenan los timers cuando la pestaña no está visible (ahorro de batería).
-  // Para mitigarlo, forzamos un chequeo inmediato cada vez que la pestaña vuelve a primer plano.
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ checkAlerts(); } });
 }
 
 let liveClockTimer=null;
@@ -210,10 +207,15 @@ function startLiveClock(){
   updateLiveClock();
   if(liveClockTimer) clearInterval(liveClockTimer);
   liveClockTimer=setInterval(updateLiveClock, 1000);
-  // Igual que con las alertas: al volver a la pestaña, resincronizar al instante
-  // en vez de esperar hasta el próximo tick (que puede tardar hasta 1s de más).
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ updateLiveClock(); } });
 }
+// Un solo listener de visibilidad para todos los timers — evita acumular listeners duplicados
+// si startAlertLoop/startLiveClock se llaman más de una vez (ej. en resize).
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible'){
+    checkAlerts();
+    updateLiveClock();
+  }
+});
 
 function updateNotifUI(){
   const btn=$('#notifBtn'), status=$('#notifStatus');
@@ -252,7 +254,7 @@ function render(){
   $('#weekSub').textContent=`Semana ${weekLabel(data.weekStart)}`;
 
   wbTotal().textContent=fmtMinutes(computeTotals(data));
-  const saldo=computeSaldoMin(data); wbSaldo().textContent=saldo>0?("+"+saldo):String(saldo); wbSaldo().className="seg-val "+(saldo>0?"pos":(saldo<0?"neg":"neu"));
+  const saldo=computeSaldoMin(data); wbSaldo().textContent=saldo>0?("+"+fmtMinutes(saldo)):fmtMinutes(saldo); wbSaldo().className="seg-val "+(saldo>0?"pos":(saldo<0?"neg":"neu"));
   let suggest="—";
   if(idxToday>=0&&idxToday<=4){
     const recToday=data.days[idxToday]||{};
@@ -474,7 +476,7 @@ $('#historyBtn').onclick=()=>{
     hist.forEach(h=>{
       const item=document.createElement('div'); item.className='history-item';
       const left=document.createElement('div'); left.className='hw'; left.textContent=weekLabel(h.weekStart);
-      const right=document.createElement('div'); right.className='hv'; right.textContent=fmtMinutes(h.total)+ " ("+(h.saldo>0?"+":"")+h.saldo+")";
+      const right=document.createElement('div'); right.className='hv'; right.textContent=fmtMinutes(h.total)+ " ("+(h.saldo>0?"+":"")+fmtMinutes(h.saldo)+")";
       item.appendChild(left); item.appendChild(right); list.appendChild(item);
     });
   }
