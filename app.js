@@ -14,6 +14,8 @@ const IN_BOUNDS=[7*60+30,9*60+30]; const OUT_MIN=15*60+30;
 const IN_WARN_LEAD=20; // minutos antes del tope de ingreso (9:30) para empezar a avisar
 const OUT_WARN_LEAD=10; // minutos antes de la salida sugerida para avisar
 const $=s=>document.querySelector(s);
+function openModal(id){ const m=$(id); if(!m) return; m.hidden=false; requestAnimationFrame(()=>m.classList.add('modalOpen')); }
+function closeModal(id){ const m=$(id); if(!m) return; m.classList.remove('modalOpen'); setTimeout(()=>{ m.hidden=true; },220); }
 const daysEl=()=>$('#days'); const wbTotal=()=>$('#wbTotal'); const wbSaldo=()=>$('#wbSaldo'); const wbSuggestTop=()=>$('#wbSuggestTop'); const toast=()=>$('#toast');
 let editCtx=null; let deferredPrompt=null; let lastTap=0; const TAP_DELAY=260; const LONGPRESS_DELAY=420;
 let alertTimer=null;
@@ -96,13 +98,13 @@ function applyGreeting(){
 }
 function maybeAskName(){
   if(getUserName()) return;
-  $('#nameModal').hidden=false; $('#nameModal').style.display='flex';
+  openModal('#nameModal');
   setTimeout(()=>$('#nameInput').focus(),80);
 }
 $('#saveNameBtn')?.addEventListener('click',()=>{
   const v=$('#nameInput').value.trim();
   if(v){ setUserName(v); }
-  $('#nameModal').style.display='none'; $('#nameModal').hidden=true;
+  closeModal('#nameModal');
 });
 $('#nameInput')?.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ $('#saveNameBtn').click(); } });
 function targetDayMin(){const s=getSettings().dailyTarget||"07:30";const [hh,mm]=s.split(":").map(Number);return hh*60+(mm||0)}
@@ -171,6 +173,7 @@ async function fireNotification(title,body){
 }
 
 let _lastBannerKind=null;
+let _justMarked=null; // {dayIdx, kind} — para animar el pill recién marcado en el próximo render, una sola vez
 function setBanner(kind,text){
   const b=$('#alertBanner'), t=$('#alertBannerText');
   if(!text){ b.hidden=true; _lastBannerKind=null; return }
@@ -345,6 +348,9 @@ function render(){
     const row=document.createElement('div');row.className='clockRow';
     const inP=document.createElement('button');inP.className='pill'+(rec.in?'':' empty');inP.textContent=rec.in?new Date(rec.in).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):"Ingreso";
     const outP=document.createElement('button');outP.className='pill'+(rec.out?'':' empty');outP.textContent=rec.out?new Date(rec.out).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):"Egreso";
+    if(_justMarked && _justMarked.dayIdx===i){
+      (_justMarked.kind==='in'?inP:outP).classList.add('justMarked');
+    }
     inP.onclick=()=>{if(readonly())return;openManual(i,'in',rec.in)};
     outP.onclick=()=>{if(readonly())return;openManual(i,'out',rec.out)};
     row.appendChild(inP);row.appendChild(outP);card.appendChild(row);
@@ -363,6 +369,7 @@ function render(){
     if(HOLIDAYS.has(dayDate.toISOString().slice(0,10))){[inP,outP,bIn,bOut].forEach(el=>{el.disabled=true;el.title='Feriado - bloqueado'});dur.textContent='Feriado';dur.style.opacity=.9}
     cont.appendChild(card);
   }
+  _justMarked=null;
 }
 
 function attachGestures(card,i){
@@ -436,9 +443,9 @@ function openManual(dayIdx,field,iso){
   $('#modalLabel').innerText=WEEKDAYS[dayIdx]+" — "+(field==='in'?'Ingreso':'Egreso');
   $('#modalHint').innerText= field==='out' ? "Egreso: no antes de las 15:30." : "Ingreso permitido: 07:30 a 09:30.";
   const hh=$('#hh'), mm=$('#mm'); if(iso){const d=new Date(iso);hh.value=d.getHours();mm.value=d.getMinutes()} else {hh.value="";mm.value=""}
-  $('#timeModal').hidden=false; $('#timeModal').style.display='flex'; setTimeout(()=>{hh.focus();hh.select()},50);
+  openModal('#timeModal'); setTimeout(()=>{hh.focus();hh.select()},50);
 }
-$('#cancelEdit').onclick=()=>{ $('#timeModal').style.display='none'; $('#timeModal').hidden=true; editCtx=null };
+$('#cancelEdit').onclick=()=>{ closeModal('#timeModal'); editCtx=null };
 function maybeJump(){ const hh=$('#hh'), mm=$('#mm'); const v=(hh.value||'').trim(); if(v.length>=2){ const n=parseInt(v,10); if(!isNaN(n)&&n>=0&&n<=23){ mm.focus(); mm.select(); } } }
 $('#hh').addEventListener('input', maybeJump);
 $('#hh').addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); maybeJump(); }});
@@ -454,7 +461,7 @@ $('#saveEdit').onclick=()=>{
          if(!confirmSaldoNegativoSiCorresponde(editCtx.dayIdx, data, data.days[editCtx.dayIdx].in, d.toISOString())) return; }
   if(!data.days[editCtx.dayIdx]) data.days[editCtx.dayIdx]={};
   data.days[editCtx.dayIdx][editCtx.field]=d.toISOString(); saveState(data);
-  $('#timeModal').style.display='none'; $('#timeModal').hidden=true; editCtx=null; render();
+  closeModal('#timeModal'); editCtx=null; render();
 };
 
 // Marcación
@@ -471,6 +478,7 @@ function mark(dayIdx,kind){
   if(!data.days[dayIdx]) data.days[dayIdx]={};
   data.days[dayIdx][kind]=d.toISOString(); saveState(data);
   if(kind==='in') playSoundIn(); else playSoundOut();
+  _justMarked={dayIdx,kind};
   if(kind==='in'){
     const ingresoHoyMin = now.getHours()*60+now.getMinutes();
     const saldoPrevios = computeSaldoPrevios(data,dayIdx);
@@ -539,15 +547,15 @@ $('#historyBtn').onclick=()=>{
       item.appendChild(left); item.appendChild(right); list.appendChild(item);
     });
   }
-  $('#historyModal').hidden=false; $('#historyModal').style.display='flex';
+  openModal('#historyModal');
 };
-$('#closeHistory').onclick=()=>{ $('#historyModal').style.display='none'; $('#historyModal').hidden=true; };
+$('#closeHistory').onclick=()=>{ closeModal('#historyModal'); };
 
 // Settings
-$('#settingsBtn').onclick=()=>{ const s=getSettings(); $('#settingsModal').hidden=false; $('#settingsModal').style.display='flex'; $('#readonlyToggle').checked=readonly(); $('#dailyTarget').value=s.dailyTarget||"07:30"; $('#densitySel').value=s.density||"comfy"; $('#accentSel').value=s.accent||"lime"; $('#nameSettingsInput').value=getUserName(); $('#soundToggle').checked=soundEnabled(); updateNotifUI(); };
+$('#settingsBtn').onclick=()=>{ const s=getSettings(); openModal('#settingsModal'); $('#readonlyToggle').checked=readonly(); $('#dailyTarget').value=s.dailyTarget||"07:30"; $('#densitySel').value=s.density||"comfy"; $('#accentSel').value=s.accent||"lime"; $('#nameSettingsInput').value=getUserName(); $('#soundToggle').checked=soundEnabled(); updateNotifUI(); };
 $('#soundToggle')?.addEventListener('change',(e)=>{ setSoundEnabled(e.target.checked); if(e.target.checked) playSoundIn(); });
 $('#nameSettingsInput')?.addEventListener('change',(e)=>{ setUserName(e.target.value); });
-$('#closeSettings').onclick=()=>{ $('#settingsModal').style.display='none'; $('#settingsModal').hidden=true };
+$('#closeSettings').onclick=()=>{ closeModal('#settingsModal'); };
 $('#readonlyToggle').onchange=e=>{ localStorage.setItem(RO_KEY, e.target.checked?'1':'0'); applyReadonly(); };
 $('#dailyTarget').addEventListener('change',e=>{ const s=getSettings(); s.dailyTarget=e.target.value||"07:30"; setSettings(s); render(); });
 $('#densitySel').addEventListener('change',e=>{ const s=getSettings(); s.density=e.target.value; setSettings(s); });
@@ -590,7 +598,7 @@ $('#hideInstallTip').addEventListener('click',()=>{ localStorage.setItem(INSTALL
 $('#showInstallTipBtn')?.addEventListener('click',()=>{
   localStorage.removeItem(INSTALL_TIP_DISMISSED_KEY);
   updateInstallTip();
-  $('#settingsModal').style.display='none'; $('#settingsModal').hidden=true;
+  closeModal('#settingsModal');
   $('#installTip')?.scrollIntoView({behavior:'smooth', block:'start'});
 });
 

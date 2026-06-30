@@ -110,7 +110,11 @@ body.desktop .app{max-width:520px}
   background:var(--panel);border:2px solid var(--line);border-radius:5px;
   padding:14px 14px;display:flex;flex-direction:column;gap:10px;position:relative;
 }
-.dayCard.active{border-color:var(--lime)}
+.dayCard.active{border-color:var(--lime);animation:cardBreathe 3s ease-in-out infinite}
+@keyframes cardBreathe{
+  0%,100%{box-shadow:0 0 0 rgba(74,222,128,0)}
+  50%{box-shadow:0 0 14px rgba(74,222,128,.25)}
+}
 .dayHead{display:flex;align-items:center;gap:10px}
 .led{width:11px;height:11px;border-radius:50%;background:var(--line);box-shadow:inset 0 1px 2px #000;flex-shrink:0}
 .dayCard.active .dayHead .led{background:var(--lime);box-shadow:0 0 7px var(--lime),inset 0 1px 1px rgba(255,255,255,.4)}
@@ -125,17 +129,27 @@ body.desktop .app{max-width:520px}
   font-family:'Share Tech Mono',monospace;font-variant-numeric:tabular-nums;font-weight:700;font-size:.9rem;
   background:var(--bolt);border:1.5px solid var(--line);border-radius:4px;
   padding:7px 10px;min-width:74px;text-align:center;color:var(--text);cursor:pointer;flex:1;
+  transition:background-color .25s ease, border-color .25s ease, transform .2s ease;
 }
 .pill:hover{border-color:var(--muted)}
 .pill.empty{color:var(--muted);border-style:dashed;font-weight:500}
 .pill:disabled{opacity:.4;cursor:not-allowed}
+.pill.justMarked{animation:pillPop .35s ease}
+@keyframes pillPop{
+  0%{transform:scale(1)}
+  40%{transform:scale(1.08);border-color:var(--lime)}
+  100%{transform:scale(1)}
+}
 
 .suggestRow{display:flex;justify-content:space-between;align-items:center;font-size:.82rem;color:var(--muted);width:100%}
 .suggestRow .value{font-family:'Share Tech Mono',monospace;color:var(--amber);font-weight:700}
 
 .actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:60}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:60;opacity:0;visibility:hidden;transition:opacity .22s ease;pointer-events:none}
+.modal.modalOpen{opacity:1;visibility:visible;pointer-events:auto}
+.modal .panel{transform:scale(.96) translateY(6px);transition:transform .22s ease}
+.modal.modalOpen .panel{transform:scale(1) translateY(0)}
 .panel{width:min(480px,92vw);background:var(--panel);border:2px solid var(--line);border-radius:6px;padding:18px;max-height:85vh;overflow-y:auto}
 .panel h3{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px;font-size:1.05rem}
 .help{font-size:.78rem;color:var(--muted);margin-bottom:10px}
@@ -181,6 +195,11 @@ input[type=number],input[type=time],input[type=text],select{
   border-radius:5px;padding:10px 14px;margin-bottom:14px;
   font-family:'Oswald',sans-serif;font-weight:600;font-size:.83rem;
   border:2px solid var(--line);
+  animation:bannerSlideIn .3s ease;
+}
+@keyframes bannerSlideIn{
+  0%{opacity:0;transform:translateY(-8px)}
+  100%{opacity:1;transform:translateY(0)}
 }
 .alert-banner.info{background:rgba(96,212,232,.08);border-color:rgba(96,212,232,.35);color:#9FE3EC}
 .alert-banner.good{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.4);color:var(--lime)}
